@@ -68,9 +68,9 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
 
     CRM_Core_DAO::executeQuery("
         INSERT INTO civicrm_direct_debit
-        (ddi_reference, created)
+        (ddi_reference)
         VALUES
-        (%1, NOW())
+        (%1)
         ", array(1 => array((string)$tempDDIReference , 'String'))
     );
 
@@ -101,7 +101,7 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
     return $DDIReference;
   }
 
-  static function isDDSubmissionComplete( $DDIReference ) {
+  function isDDSubmissionComplete( $DDIReference ) {
     $isComplete = false;
 
     $selectSql     =  " SELECT complete_flag ";
@@ -119,40 +119,35 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
     return $isComplete;
   }
 
-  static function getCompanyName() {
-    $domain = CRM_Core_BAO_Domain::getDomain();
-    return $domain->name;
+  function getCompanyName() {
+    return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_name' );
   }
 
-  static function getCompanyAddress() {
+  function getCompanyAddress() {
+
     $companyAddress = array();
 
-    $domain = CRM_Core_BAO_Domain::getDomain();
-    $domainLoc = $domain->getLocationValues();
-
-    $companyAddress['company_name'] = $domain->name;
-    if (!empty($domainLoc['address'])) {
-      $companyAddress['address1']     = $domainLoc['address'][1]['street_address'];
-      $companyAddress['address2']     = $domainLoc['address'][1]['supplemental_address_1'];
-      $companyAddress['address3']     = $domainLoc['address'][1]['supplemental_address_2'];
-      $companyAddress['town']         = $domainLoc['address'][1]['city'];
-      $companyAddress['postcode']     = $domainLoc['address'][1]['postal_code'];
-      $companyAddress['county']       = CRM_Core_PseudoConstant::county($domainLoc['address'][1]['county_id']);
-      $companyAddress['country_id']   = CRM_Core_PseudoConstant::country($domainLoc['address'][1]['country_id']);
-    }
+    $companyAddress['company_name'] = CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_name'     );
+    $companyAddress['address1']     = CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_address1' );
+    $companyAddress['address2']     = CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_address2' );
+    $companyAddress['address3']     = CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_address3' );
+    $companyAddress['address4']     = CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_address4' );
+    $companyAddress['town']         = CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_town'     );
+    $companyAddress['county']       = CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_county'   );
+    $companyAddress['postcode']     = CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME,'company_postcode' );
 
     return $companyAddress;
   }
 
-  static function getActivityType() {
+  function getActivityType() {
     return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME, 'activity_type' );
   }
 
-  static function getActivityTypeLetter() {
+  function getActivityTypeLetter() {
     return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME, 'activity_type_letter' );
   }
 
-  static function getTelephoneNumber() {
+  function getTelephoneNumber() {
     return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME, 'telephone_number' );
   }
 
@@ -160,15 +155,15 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
     return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME, 'email_address' );
   }
 
-  static function getDomainName() {
+  function getDomainName() {
     return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME, 'domain_name' );
   }
 
-  static function getTransactionPrefix() {
+  function getTransactionPrefix() {
     return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME, 'transaction_prefix' );
   }
 
-  static function getAutoRenewMembership() {
+  function getAutoRenewMembership() {
     return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME, 'auto_renew_membership' );
   }
 
@@ -211,7 +206,7 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
                                                      'title'       => ts( 'Account Holder' ),
                                                      'cc_field'    => TRUE,
                                                      'attributes'  => array( 'size'         => 20
-                                                                           , 'maxlength'    => 18
+                                                                           , 'maxlength'    => 34
                                                                            , 'autocomplete' => 'on'
                                                                            ),
                                                      'is_required' => TRUE
@@ -321,17 +316,12 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
         if ( isset($field['cc_field'] ) &&
           $field['cc_field']
         ) {
-          if ($field['htmlType'] == 'chainSelect') {
-            $form->addChainSelect($field['name'], array('required' => $useRequired && $field['is_required']));
-          }
-          else {
-            $form->add( $field['htmlType'],
-                        $field['name'],
-                        $field['title'],
-                        CRM_Utils_Array::value('attributes', $field),
-                        $useRequired ? $field['is_required'] : FALSE
-                      );
-          }
+          $form->add( $field['htmlType'],
+                      $field['name'],
+                      $field['title'],
+                      $field['attributes'],
+                      $useRequired ? $field['is_required'] : FALSE
+                    );
         }
       }
 
@@ -359,7 +349,7 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
     $form->setDefaults($defaults);
   }
 
-  static function formatPrefferedCollectionDay( $collectionDay ) {
+  function formatPrefferedCollectionDay( $collectionDay ) {
     $ends = array( 'th'
                  , 'st'
                  , 'nd'
@@ -382,14 +372,14 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
   /*
    * Function will return the SUN number broken down into individual characters passed as an array
    */
-  static function getSUNParts() {
+  function getSUNParts() {
     return str_split( self::getSUN() );
   }
 
   /*
    * Function will return the SUN number broken down into individual characters passed as an array
    */
-  static function getSUN() {
+  function getSUN() {
     return CRM_Core_BAO_Setting::getItem( self::SETTING_GROUP_UK_DD_NAME, 'service_user_number' );
   }
 
@@ -521,7 +511,8 @@ EOF;
     return $activityID;
   }
 
-  static function firstCollectionDate( $collectionDay, $startDate ) {
+  function firstCollectionDate( $collectionDay, $startDate ) {
+
     // Initialise date objects with today's date
     $today                    = new DateTime();
     $todayPlusDateInterval    = new DateTime();
@@ -737,7 +728,7 @@ EOF;
       exit;
   }
 
-  static function record_response( $direct_debit_response ) {
+  function record_response( $direct_debit_response ) {
     $sql  = <<<EOF
             UPDATE civicrm_direct_debit
             SET    created                  = NOW()

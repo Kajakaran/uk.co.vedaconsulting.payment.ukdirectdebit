@@ -103,8 +103,8 @@
                         <p><strong>{ts 1=$frequency_interval 2=$frequency_unit}I want to contribute this amount every %1 %2(s).{/ts}</strong></p>
                     {/if}
                     {if $paymentProcessor.payment_type & 2}
-                        <p><strong>{ts 1=$direct_debit_details.formatted_preferred_collection_day 2=$frequency_unit 3=$direct_debit_details.first_collection_date|crmDate}Your preferred collection day is the %1 of every %2 and your first collection will be on or after the %3.{/ts}</strong></p>
-                        <p><strong>{ts 1=$direct_debit_details.confirmation_method}Your confirmation will be sent by %1.{/ts}</strong></p>
+                        <p><strong>{ts 1=$direct_debit_details.formatted_preferred_collection_day 2=$frequency_unit 3=$direct_debit_details.first_collection_date|crmDate}You're preferred collection day is the %1 of every %2 and your first collection will be on or after the %3.{/ts}</strong></p>
+                        <p><strong>{ts 1=$direct_debit_details.confirmation_method}You're confirmation will be sent by %1.{/ts}</strong></p>
                         <p><strong>{ts 1=$direct_debit_details.company_name}The company name which will appear on your bank statement against the Direct Debit will be "%1".{/ts}</strong></p>
                     {else}
                         <p>{ts}Your initial contribution will be processed once you complete the confirmation step. You will be able to modify or cancel future contributions at any time by logging in to your account.{/ts}</p>
@@ -127,19 +127,7 @@
     </div>
     {/if}
         
-    {if $honor_block_is_active}
-        <div class="crm-group honor_block-group">
-            <div class="header-dark">
-                {$soft_credit_type}
-            </div>
-            <div class="display-block">
-                <div class="label-left crm-section honoree_profile-section">
-                    <strong>{$honorName}</strong></br>
-                    {include file="CRM/UF/Form/Block.tpl" fields=$honoreeProfileFields prefix='honor'}
-                </div>
-            </div>
-         </div>
-    {/if}
+    {include file="CRM/Contribute/Form/Contribution/Honor.tpl"}
 
     {if $customPre}
             <fieldset class="label-left">

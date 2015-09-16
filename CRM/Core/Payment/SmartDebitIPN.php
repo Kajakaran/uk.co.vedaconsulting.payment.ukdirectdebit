@@ -126,25 +126,8 @@ CRM_Core_Error::debug_log_message('CRM_Core_Payment_SmartDebitIPN.getValue name=
     //set transaction type
     $txnType = $input['txnType'];
     //Changes for paypal pro recurring payment
-   
+
     switch ( strtolower( $txnType ) ) {
-
-      case 'subscr_cancel':
-        $recur->contribution_status_id = 3;
-        $recur->cancel_date = $now;
-        $objects['contribution']->source  = ts('Cancel Recurring Contribution: Smart Debit API');
-        $objects['contribution']->receive_date  = $now;
-        CRM_Activity_BAO_Activity::addActivity($objects['contribution'], NULL);
-        break;
-
-      case 'subscr_failed':
-        $recur->contribution_status_id = 4;
-        $recur->modified_date = $now;
-        $objects['contribution']->source  = ts('Fail Recurring Contribution: Smart Debit API');
-        $objects['contribution']->receive_date  = $now;
-        CRM_Activity_BAO_Activity::addActivity($objects['contribution'], NULL);
-        break;
-      
       case 'recurring_payment_profile_created':
         CRM_Core_Error::debug_log_message("recurring_payment_profile_created");
         $recur->create_date            = $now;
@@ -163,33 +146,8 @@ CRM_Core_Error::debug_log_message('CRM_Core_Payment_SmartDebitIPN.getValue name=
           //$recur->start_date = $now;
           $recur->payment_instrument_id = UK_Direct_Debit_Form_Main::getDDPaymentInstrumentID();
           $recur->trxn_id = $input['trxn_id'];
-          $recur->processor_id = $input['trxn_id'];
           $recur->cycle_day = $input['collection_day'];
           $recur->start_date = $input['start_date'];
-		  
-		  //Create membership_id column in recur table if not exists.
-          if($ids['membership']) {
-            $columnExists = CRM_Core_DAO::checkFieldExists('civicrm_contribution_recur', 'membership_id');
-            if(!$columnExists) {
-              $query = "
-                ALTER TABLE civicrm_contribution_recur
-                ADD membership_id int(10) unsigned AFTER contact_id,
-                ADD CONSTRAINT FK_civicrm_contribution_recur_membership_id
-                FOREIGN KEY(membership_id) REFERENCES civicrm_membership(id) ON DELETE CASCADE ON UPDATE RESTRICT";
-
-              CRM_Core_DAO::executeQuery($query);
-            }
-
-            // Populate membership_id
-
-            $query = "
-            UPDATE civicrm_contribution_recur
-            SET membership_id = %1
-            WHERE id = %2 ";
-
-            $params = array( 1 => array( $ids['membership'][0], 'Int' ), 2 => array($ids['contributionRecur'], 'Int') );
-            $dao = CRM_Core_DAO::executeQuery($query, $params);
-          }
         }
         else {
           $recur->modified_date = $now;
@@ -240,12 +198,6 @@ CRM_Core_Error::debug_log_message('CRM_Core_Payment_SmartDebitIPN.getValue name=
 
       // create a contribution and then get it processed
       $contribution = new CRM_Contribute_BAO_Contribution();
-      $contribution->trxn_id = $input['trxn_id'];
-      if ($contribution->trxn_id && $contribution->find()) {
-        CRM_Core_Error::debug_log_message("returning since contribution has already been handled");
-        echo "Success: Contribution has already been handled<p>";
-        return TRUE;
-      }
       $contribution->contact_id = $ids['contact'];
       $contribution->contribution_type_id = $objects['contributionType']->id;
       $contribution->contribution_page_id = $ids['contributionPage'];
@@ -300,8 +252,7 @@ CRM_Core_Error::debug_log_message('CRM_Core_Payment_SmartDebitIPN.getValue name=
         // Set the received date to the date expected for DD payments
         $contribution->receive_date = $input['start_date'];
     }
-    // KJ 13/07/2015 Fix for first payment's contribution receive_date as it takes today date 
-    $contribution->save();
+    
     $transaction = new CRM_Core_Transaction();
 
     // fix for CRM-2842
@@ -311,17 +262,16 @@ CRM_Core_Error::debug_log_message('CRM_Core_Payment_SmartDebitIPN.getValue name=
 
     $participant = &$objects['participant'];
     $membership  = &$objects['membership'];
-    if (!empty($membership)) {
-      $first_membership_object = &$membership[key($membership)];
-
-      // PS Set the recurring against the membership in case its not set already
-      // Not sure why its not getting set - seems like a bug in core somewhere thats probably something to do with the payment instrument being credit card or something 
-      CRM_Core_Error::debug_log_message("About to check if recurring (".$first_membership_object->contribution_recur_id.")");
-      if ($recur && $first && empty($first_membership_object->contribution_recur_id)) {
+    $first_membership_object = &$membership[key($membership)];
+    
+    // PS Set the recurring against the membership in case its not set already
+    // Not sure why its not getting set - seems like a bug in core somewhere thats probably something to do with the payment instrument being credit card or something 
+    CRM_Core_Error::debug_log_message("About to check if recurring (".$first_membership_object->contribution_recur_id.")");
+    if ($recur && $first && empty($first_membership_object->contribution_recur_id)) {
         CRM_Core_Error::debug_log_message("Its Recurring and membership isn't set so set it to ".$ids['contributionRecur']);
         $first_membership_object->contribution_recur_id = $ids['contributionRecur'];
-      }
-    }    
+    }
+    
     CRM_Core_Error::debug_log_message( 'membership:' . print_r( $membership, true ) );
 
     $status = $input['paymentStatus'];
@@ -391,7 +341,6 @@ CRM_Core_Error::debug_log_message('CRM_Core_Payment_SmartDebitIPN.getValue name=
       $ids['contributionPage']    = self::retrieve( 'contributionPageID' , 'Integer', 'GET', FALSE );
       $ids['related_contact']     = self::retrieve( 'relatedContactID'   , 'Integer', 'GET', FALSE );
       $ids['onbehalf_dupe_alert'] = self::retrieve( 'onBehalfDupeAlert'  , 'Integer', 'GET', FALSE );
-      $ids['financial_type_id']   = self::retrieve( 'financial_type_id'  , 'Integer', 'GET', FALSE );
     }
     
 
@@ -420,13 +369,13 @@ EOF;
     CRM_Core_Error::debug_log_message( '$sqlParams:'           . print_r( $sqlParams          , true ) );
     CRM_Core_Error::debug_log_message( '$contributionRecurId:' . print_r( $contributionRecurId, true ) );
 */
-    $paymentProcessorID = CRM_Core_DAO::getFieldValue(  'CRM_Financial_DAO_PaymentProcessorType'
+    $paymentProcessorID = CRM_Core_DAO::getFieldValue(  'CRM_Core_DAO_PaymentProcessorType'
                                                       , 'Smart Debit'
                                                       , 'id'
                                                       , 'name'
                                                       );
 
-    if ( !$this->validateData( $input, $ids, $objects, FALSE, $paymentProcessorID ) ) {
+    if ( !$this->validateData( $input, $ids, $objects, TRUE, $paymentProcessorID ) ) {
       return FALSE;
     }
 
@@ -435,8 +384,7 @@ EOF;
       if ( $ids['contributionRecur'] ) {
         // check if first contribution is completed, else complete first contribution
         $first = TRUE;
-        //KJ 13/07/2015 membership contribution comes as status 'completed' before IPN fired.
-        if ( ($objects['contribution']->contribution_status_id == 1) && empty($ids['membership']) ) {
+        if ( $objects['contribution']->contribution_status_id == 1 ) {
           $first = FALSE;
         }
         CRM_Core_Error::debug_log_message( 'Calling $this->recur()' );

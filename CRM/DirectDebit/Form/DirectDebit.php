@@ -63,7 +63,7 @@ class CRM_DirectDebit_Form_DirectDebit extends CRM_Core_Form
             $defaults = array(
                               'setting_id'=>$dao->id ,
                               'setting_name'=>$dao->name,
-                              'setting_value'=> unserialize($dao->value),
+                              'setting_value'=>$dao->value,
                               );
         }
 
@@ -99,26 +99,23 @@ class CRM_DirectDebit_Form_DirectDebit extends CRM_Core_Form
         
         $settingId   = $params['setting_id'];
         $settingName = $params['setting_name'];
-        $settingValue   = serialize($params['setting_value']);
+        $settingValue   = $params['setting_value'];
                 
         $update_sql  = " UPDATE civicrm_setting ";
         $update_sql .= " SET name = %0 ";
         $update_sql .= " ,   value = %1 ";
         $update_sql .= " WHERE id = %2 ";
-        //MV : to updated serialize value in civicrm setting table.
-        if(!empty($settingValue)){
-            // $settingValue = serialize($settingValue);
-            CRM_Core_DAO::executeQuery($update_sql, array(
-                array((string)$settingName,  'String'),
-                array((string)$settingValue, 'String'),
-                array((string)$settingId,    'Integer'),
-            )); 
 
-            $status = ts('Setting Updated');        
-            CRM_Core_Session::setStatus( $status );
-        }
+        CRM_Core_DAO::executeQuery($update_sql, array(
+            array((string)$settingName,  'String'),
+            array((string)$settingValue, 'String'),
+            array((string)$settingId,    'Integer'),
+        )); 
 
-        CRM_Utils_System::redirect( 'civicrm/directdebit/display' , 'reset=1' );
+        $status = ts('Setting Updated');        
+        CRM_Core_Session::setStatus( $status );
+
+        drupal_goto( 'civicrm/directdebit/display' , 'reset=1' );
 
     } //end of function    
 
