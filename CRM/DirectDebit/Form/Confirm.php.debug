@@ -287,7 +287,7 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
       $params = array( 1 => array( $smartDebitRecord, 'String' ) );
       $dao = CRM_Core_DAO::executeQuery( $sql, $params);
 
-      $selectQuery  = "SELECT `receive_date` as receive_date FROM `veda_civicrm_smartdebit_import` WHERE `transaction_id` = '{$smartDebitRecord}'";
+      $selectQuery  = "SELECT `receive_date` as receive_date, `amount` as amount FROM `veda_civicrm_smartdebit_import` WHERE `transaction_id` = '{$smartDebitRecord}'";
       $daoSelect    = CRM_Core_DAO::executeQuery($selectQuery);
       $daoSelect->fetch();
 
@@ -306,7 +306,7 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
           'version'                => 3,
           'contact_id'             => $dao->contact_id,
           'contribution_recur_id'  => $dao->contribution_recur_id,
-          'total_amount'           => $dao->amount,
+          'total_amount'           => $daoSelect->amount,
           'invoice_id'             => md5(uniqid(rand(), TRUE )),
           'trxn_id'                => $smartDebitRecord.'/'.CRM_Utils_Date::processDate($receiveDate),
           'financial_type_id'      => $financialTypeID,
@@ -315,6 +315,11 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
           'source'                 => 'Smart Debit Import',
           'receive_date'           => CRM_Utils_Date::processDate($receiveDate),
         );
+
+        // Check if the contribution is first payment
+        // if yes, update the contribution instead of creating one
+        // as CiviCRM should have created the first contribution
+        $contributeParams = self::checkIfFirstPayment($contributeParams, $dao->frequency_unit);
 
         // Allow params to be modified via hook
         CRM_DirectDebit_Utils_Hook::alterSmartDebitContributionParams( $contributeParams );
@@ -329,9 +334,22 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
 
           $contributionID   = $contributeResult['id'];
           $contriReurID     = $contributeResult['values'][$contributionID]['contribution_recur_id'];
-          $membershipQuery  = "SELECT `membership_id` FROM `civicrm_contribution_recur` WHERE `id` = %1";
+	  $columnExists	    = CRM_Core_DAO::checkFieldExists('civicrm_contribution_recur', 'membership_id');
+          if($columnExists) {
+	    $membershipQuery  = "SELECT `membership_id` FROM `civicrm_contribution_recur` WHERE `id` = %1";
+	    $membershipID     = CRM_Core_DAO::singleValueQuery($membershipQuery, array( 1 => array( $contriReurID, 'Int' ) ) );
+	  }
 
-          $membershipID   = CRM_Core_DAO::singleValueQuery($membershipQuery, array( 1 => array( $contriReurID, 'Int' ) ) );
+          // If membership ID is empty, check if we can get from contribution_membership table
+          // Latest CiviCRM versions have contribution_recur_id in civicrm_membership table
+          if (empty($membershipID)) {
+            $columnExists	    = CRM_Core_DAO::checkFieldExists('civicrm_membership', 'contribution_recur_id');
+            if($columnExists) {
+              $membershipQuery  = "SELECT `id` FROM `civicrm_membership` WHERE `contribution_recur_id` = %1";
+              $membershipID     = CRM_Core_DAO::singleValueQuery($membershipQuery, array( 1 => array( $contriReurID, 'Int' ) ) );
+            }
+          }
+
           // CRM_Core_Error::debug_log_message('membershipID = '. print_r($membershipID, TRUE));
           if (!empty($membershipID)) {
 
@@ -343,7 +361,7 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
                                       );
 
             $membershipEndDate   = $getMembership['values'][$membershipID]['end_date'];
-			$membershipStartDate   = $getMembership['values'][$membershipID]['start_date'];
+            $membershipStartDate   = $getMembership['values'][$membershipID]['start_date'];
             $membership_renew_from   = $getMembership['values'][$membershipID]['end_date'];
 
             $tempEndDateArray['from'] = date('d-M-Y', strtotime($membershipEndDate));
@@ -362,20 +380,18 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
 
             $frequencyUnit = $contributionRecurring['values'][$contriReurID]['frequency_unit'];
             $frequency     = $contributionRecurring['values'][$contriReurID]['frequency_unit'];
-			$frequencyInterval     = $contributionRecurring['values'][$contriReurID]['frequency_interval'];
-			
-// CRM_Core_Error::debug_log_message('frequencyUnit = '. print_r($frequencyUnit, TRUE));
+            $frequencyInterval     = $contributionRecurring['values'][$contriReurID]['frequency_interval'];
+            
+            // CRM_Core_Error::debug_log_message('frequencyUnit = '. print_r($frequencyUnit, TRUE));
             if (!is_null($frequencyUnit)) {
-              //$membershipEndDateString = date("Y-m-d",strtotime(date("Y-m-d", strtotime($membershipEndDate)) . " + $frequencyUnit"));
-              //$membership_renew_to    = date("Y-m-d",strtotime(date("Y-m-d", strtotime($membershipEndDate)) . " +1 $frequencyUnit"));
-			  $membershipEndDateString = date('Y-m-t', strtotime("+$frequencyInterval $frequencyUnit", strtotime($membershipEndDate)));
-			  $membership_renew_to = date('Y-m-t', strtotime("+$frequencyInterval $frequencyUnit", strtotime($membershipEndDate)));			  
-			  $membershipStartDateString = 	date('Y-m-01', strtotime("+$frequencyInterval $frequencyUnit", strtotime($membershipStartDate)));
-			  
+              $membershipEndDateString = date('Y-m-t', strtotime("+$frequencyInterval $frequencyUnit", strtotime($membershipEndDate)));
+              $membership_renew_to = date('Y-m-t', strtotime("+$frequencyInterval $frequencyUnit", strtotime($membershipEndDate)));     
+              $membershipStartDateString =  date('Y-m-01', strtotime("+$frequencyInterval $frequencyUnit", strtotime($membershipStartDate)));
+     
               $membershipParams = array ( 'version'       => '3'
                                          , 'membership_id' => $membershipID
                                          , 'id'            => $membershipID
-										 , 'start_date'    => $membershipStartDateString
+                                         , 'start_date'    => $membershipStartDateString
                                          , 'end_date'      => $membershipEndDateString
                                         );
 
@@ -400,9 +416,6 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
                 $tempEndDateArray['to'] = date('d -M-Y', strtotime($membershipEndDateString));
               }
             }
-						
-						// Create membership payment
-            self::createMembershipPayment($membershipID, $contributionID);
           }
           //MV, changes to display the more information after sync.
           $tempRenewalDate  = NULL;
@@ -437,7 +450,7 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
             3 => array( $contactResult['id'], 'Integer'),
             4 => array( $contactResult['display_name'], 'String'),
             5 => array( $contributeResult['values'][$contributionID]['total_amount'], 'String'),
-            6 => array( $frequency, 'String'),
+            6 => array( $frequencyInterval." ".$frequency, 'String'),
             7 => array( $membershipRenew, 'Integer'),
             // 8 => array( $membership_renew_from, 'Date'),
             // 9 => array( $membership_renew_to, 'Date'),
@@ -474,23 +487,87 @@ class CRM_DirectDebit_Form_Confirm extends CRM_Core_Form {
     return CRM_Queue_Task::TASK_SUCCESS;
   }
 
-	function createMembershipPayment($membershipId, $contributionId) {
-    if (empty($membershipId) || empty($contributionId)) {
+  /*
+   * Function to check if the contribution is first contribution
+   * for the recurring contribution record
+   */
+  static function checkIfFirstPayment($params, $frequencyUnit = 'month') {
+
+    if (empty($params['contribution_recur_id'])) {
       return;
     }
 
-    // Check if membership payment already exist for the contribution
-    $params = array(
-      'version' => 3,
-      'membership_id' => $membershipId,
-      'contribution_id' => $contributionId,
-    );
-    $membershipPayment = civicrm_api('MembershipPayment', 'get', $params);
+    // Get days difference to determine if this is first payment
+    $days = self::daysDifferenceForFrequency($frequencyUnit);
 
-    // Create if the membership payment not exists
-    if ($membershipPayment['count'] == 0) {
-      $membershipPayment = civicrm_api('MembershipPayment', 'create', $params);
+    $contributionResult = civicrm_api3('Contribution', 'get', array(
+      'contribution_recur_id' => $params['contribution_recur_id'],
+    ));
+
+    // We have only one contribution for the recurring record
+    if ($contributionResult['count'] == 1) {
+      $contributionDetails = $contributionResult['values'][$contributionResult['id']];
+
+      if (!empty($contributionDetails['receive_date']) && !empty($params['receive_date'])) {
+        // Find the date difference between the contribution date and new collection date
+        $dateDiff = self::getDateDifference($params['receive_date'], $contributionDetails['receive_date']);
+
+        // if diff is less than set number of days, return Contribution ID to update the contribution
+        if ($dateDiff < $days) {
+          $params['id'] = $contributionResult['id'];
+          unset($params['source']);
+        }
+      }
     }
+    // Get the recent pending contribution if there are more than 1 payment for the recurring record
+    else if ($contributionResult['count'] > 1) {
+      $sqlParams = array(
+        1 => array($params['contribution_recur_id'], 'Integer'),
+      );
+      $sql = "SELECT cc.id, cc.receive_date FROM civicrm_contribution cc WHERE cc.contribution_recur_id = %1 ORDER BY cc.receive_date DESC";
+      $dao = CRM_Core_DAO::executeQuery($sql , $sqlParams);
+      while($dao->fetch()) {
+        if (!empty($dao->receive_date) && !empty($params['receive_date'])) {
+          $dateDiff = self::getDateDifference($params['receive_date'], $dao->receive_date);
+
+          // if diff is less than set number of days, return Contribution ID to update the contribution
+          if ($dateDiff < $days) {
+            $params['id'] = $dao->id;
+            unset($params['source']);
+          }
+        }
+      }
+    }
+
+    return $params;
+	}
+
+  /*
+   * Function to return number of days difference to check between current date
+   * and payment date to determine if this is first payment or not
+   */
+  static function daysDifferenceForFrequency($frequencyUnit) {
+    switch ($frequencyUnit) {
+      case 'month':
+        $days = 7;
+        break;
+
+      case 'year':
+        $days = 30;
+        break;
+
+      default:
+        $days = 7;
+        break;
+    }
+
+    return $days;
   }
 
+  /*
+   * Function to get number of days difference between 2 dates
+   */
+  static function getDateDifference($date1, $date2) {
+    return floor((strtotime($date1) - strtotime($date2))/(60*60*24));
+  }
 }

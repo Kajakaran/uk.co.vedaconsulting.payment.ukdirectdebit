@@ -211,7 +211,7 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
                                                      'title'       => ts( 'Account Holder' ),
                                                      'cc_field'    => TRUE,
                                                      'attributes'  => array( 'size'         => 20
-                                                                           , 'maxlength'    => 34
+                                                                           , 'maxlength'    => 18
                                                                            , 'autocomplete' => 'on'
                                                                            ),
                                                      'is_required' => TRUE
@@ -325,13 +325,12 @@ class UK_Direct_Debit_Form_Main extends CRM_Core_Form
             $form->addChainSelect($field['name'], array('required' => $useRequired && $field['is_required']));
           }
           else {
-            
-          $form->add( $field['htmlType'],
-                      $field['name'],
-                      $field['title'],
-                      CRM_Utils_Array::value('attributes', $field),
-                      $useRequired ? $field['is_required'] : FALSE
-                    );
+            $form->add( $field['htmlType'],
+                        $field['name'],
+                        $field['title'],
+                        CRM_Utils_Array::value('attributes', $field),
+                        $useRequired ? $field['is_required'] : FALSE
+                      );
           }
         }
       }

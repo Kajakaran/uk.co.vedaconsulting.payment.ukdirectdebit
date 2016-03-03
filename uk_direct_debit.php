@@ -514,20 +514,14 @@ function uk_direct_debit_civicrm_buildForm( $formName, &$form ) {
 
     $contactID = $_GET['cid'];
     $pageID    = $form->_id;
-    CRM_Core_Error::debug_log_message( 'in the build thank you confirm parms'. print_r($confirm_params, true), $out = false );
-    $confirmed_resource = GoCardless::confirm_resource($confirm_params);
-    CRM_Core_Error::debug_log_message( 'in the bild thank you confirmed_resources '. print_r($confirmed_resource, true), $out = false );
-    $start_date         = date('Y-m-d', strtotime($confirmed_resource->start_at));
-    $trxn_id          	= $confirmed_resource->id;
-    $recurring_contribution_status_id = CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'In Progress');
 
     $query = "
             UPDATE civicrm_contribution
-            SET trxn_id = %1 , contribution_status_id = 1, receive_date = %3
+            SET trxn_id = %1 , contribution_status_id = 1
             WHERE id = %2";
 
 		$sql = "
-            SELECT max(id) as max_id, contribution_recur_id
+            SELECT max(id) as max_id
             FROM civicrm_contribution
             WHERE contact_id = %1
             AND contribution_page_id = %2";
@@ -536,22 +530,15 @@ function uk_direct_debit_civicrm_buildForm( $formName, &$form ) {
 						$selectdao = CRM_Core_DAO::executeQuery($sql, $sql_params);
 						$selectdao->fetch();
 						$contributionId = $selectdao->max_id;
-						$contributionRecurId = $selectdao->contribution_recur_id;
 						
-						$sql_params = array( 1 => array( $_GET['resource_id'], 'String' ), 2 => array($contributionId, 'Int'), 3 => array($start_date, 'String'));
+						$sql_params = array( 1 => array( $_GET['resource_id'], 'String' ), 2 => array($contributionId, 'Int'));
             $dao = CRM_Core_DAO::executeQuery($query, $sql_params);
-	    
-	    // Update contribution recur trxn_id and start_date and status.
-	    $recurUpdateQuery = "
-	      UPDATE civicrm_contribution_recur
-	      SET trxn_id = %1, contribution_status_id = %2, start_date = %3
-	      WHERE id = %4";
-	    $recurUpdateQueryParams = array(
-        1 => array($trxn_id, 'String'),
-        2 => array($recurring_contribution_status_id, 'Int'),
-        3 => array($start_date, 'String'),
-        4 => array($contributionRecurId, 'Int'));
-	    $recurringDao = CRM_Core_DAO::executeQuery($recurUpdateQuery, $recurUpdateQueryParams);
+
+    CRM_Core_Error::debug_log_message( 'in the build thank you confirm parms'. print_r($confirm_params, true), $out = false );
+
+    $confirmed_resource = GoCardless::confirm_resource($confirm_params);
+    CRM_Core_Error::debug_log_message( 'in the bild thank you confirmed_resources '. print_r($confirmed_resource, true), $out = false );
+
 
     CRM_Core_Error::debug_log_message('uk_direct_debit_civicrm_buildform #1');
     CRM_Core_Error::debug_log_message('uk_direct_debit_civicrm_buildform form='.print_r($form, TRUE));
@@ -635,14 +622,7 @@ function uk_direct_debit_civicrm_buildForm( $formName, &$form ) {
 //            $form->assign( 'company_address', UK_Direct_Debit_Form_Main::getCompanyAddress());
 
         }
-        else if ($form->_paymentProcessor['payment_processor_type'] == 'Gocardless') {
-          $uk_direct_debit['formatted_preferred_collection_day'] 	= UK_Direct_Debit_Form_Main::formatPrefferedCollectionDay($form->_params['preferred_collection_day']);
-          $collectionDate                                         = UK_Direct_Debit_Form_Main::firstCollectionDate($form->_params['preferred_collection_day'], null); 			
-          $uk_direct_debit['first_collection_date']               = $collectionDate->format("Y-m-d");
-          $uk_direct_debit['confirmation_method']                 = 'EMAIL'; //KJ fixme as we don't give options to choose
-          $uk_direct_debit['company_name']                        = UK_Direct_Debit_Form_Main::getCompanyName();;
-	  
-        } else {
+        else {
             $uk_direct_debit['formatted_preferred_collection_day'] = '';
             $uk_direct_debit['company_name']             = UK_Direct_Debit_Form_Main::getCompanyName();
             $uk_direct_debit['bank_name']                = '';
@@ -678,12 +658,6 @@ function uk_direct_debit_civicrm_buildForm( $formName, &$form ) {
     if ($formName == 'CRM_Contribute_Form_UpdateSubscription') {
       $paymentProcessor = $form->_paymentProcessor;
       if($paymentProcessor['payment_processor_type'] == 'Smart Debit') {
-	$recurID = $form->getVar('_crid');
-	$linkedMembership = FALSE;
-	$membershipID = CRM_Core_DAO::singleValueQuery('SELECT id FROM civicrm_membership WHERE contribution_recur_id = %1', array(1=>array($recurID, 'Int')));
-	if ($membershipID) {
-	  $linkedMembership = TRUE;
-	}      
         $form->removeElement('installments');
         $frequencyType = array(
           'D'  => 'Daily',
@@ -692,7 +666,7 @@ function uk_direct_debit_civicrm_buildForm( $formName, &$form ) {
           'Y'  => 'Annually'
         );
 
-	$form->addElement('select', 'frequency_unit', ts('Frequency'),
+        $form->addElement('select', 'frequency_unit', ts('Frequency'),
             array('' => ts('- select -')) + $frequencyType
         );
         $form->addDate('start_date', ts('Start Date'), FALSE, array('formatType' => 'custom'));
@@ -713,33 +687,9 @@ function uk_direct_debit_civicrm_buildForm( $formName, &$form ) {
         list($defaults['start_date'], $defaults['start_date_time']) = CRM_Utils_Date::setDateDefaults($startDate, NULL);
         $defaults['frequency_unit'] = array_search($frequencyUnit, $frequencyUnits);
         $form->setDefaults($defaults);
-	if ($linkedMembership) {
-	  $form->assign('membership', TRUE);
-	  $e =& $form->getElement('frequency_unit');
-	  $e->freeze();
-	  $e =& $form->getElement('start_date');
-	  $e->freeze();
-	}
     }
   }
-  
-  if ($formName == 'CRM_Contribute_Form_UpdateBilling') {
-    $paymentProcessor = $form->_paymentProcessor;
-    if($paymentProcessor['payment_processor_type'] == 'Smart Debit') {
-      //Build billing details block
-      require_once 'UK_Direct_Debit/Form/Main.php';
-      $ddForm = new UK_Direct_Debit_Form_Main();
-      $ddForm->buildOfflineDirectDebit($form);	
-    }    
-  }    
-  
-  if ($formName == 'CRM_Contribute_Form_CancelSubscription') {
-    $paymentProcessorObj      = $form->getVar('_paymentProcessorObj');
-    $paymentProcessorName     = $paymentProcessorObj->_processorName;
-    if ($paymentProcessorName == 'Smart Debit Processor') {
-      $form->addRule('send_cancel_request', 'Please select one of these options', 'required');
-    }
-  }
+
 }
 
 /*************************************************************
@@ -1036,93 +986,4 @@ function uk_direct_debit_civicrm_navigationMenu( &$params ) {
                                             'active'     => 1
                                             )
                         );
-}
-
-function uk_direct_debit_civicrm_links( $op, $objectName, $objectId, &$links, &$mask, &$values ) {
-  if ($objectName == 'Membership') {
-    $cid = $values['cid'];
-    $id = $values['id'];
-    $name   = ts('Setup Direct Debit');
-    $title  = ts('Setup Direct Debit');
-    $url    = 'civicrm/directdebit/new';
-    $qs	    = "action=add&reset=1&cid=$cid&id=$id";
-    $recurID = CRM_Core_DAO::singleValueQuery('SELECT contribution_recur_id FROM civicrm_membership WHERE id = %1', array(1=>array($id, 'Int')));
-    if($recurID) {
-      $name   = ts('View Direct Debit');
-      $title  = ts('View Direct Debit');
-      $url    = 'civicrm/contact/view/contributionrecur';
-      $qs   	= "reset=1&id=$recurID&cid=$cid";
-    }
-    $links[] = array(
-              'name' => $name,
-              'title' => $title,
-              'url' => $url,
-              'qs' => $qs
-            );
-    
-  }  
-}
-
-function uk_direct_debit_civicrm_pageRun(&$page) {
-  $pageName = $page->getVar('_name');
-  if ($pageName == 'CRM_Contribute_Page_ContributionRecur') {
-      $session = CRM_Core_Session::singleton();
-      $contactID = $session->get('userID');
-    if (CRM_Contact_BAO_Contact_Permission::allow($contactID, CRM_Core_Permission::EDIT)) {
-      $recurID = $page->getVar('_id');
-      $query = "
-	SELECT cr.trxn_id FROM civicrm_contribution_recur cr
-	INNER JOIN civicrm_payment_processor cpp ON cpp.id = cr.payment_processor_id
-	INNER JOIN civicrm_payment_processor_type cppt ON cppt.id = cpp.payment_processor_type_id
-	WHERE cppt.name = %1 AND cr.id = %2";
-
-      $queryParams = array (
-	1 => array('Smart Debit', 'String'),
-	2 => array($recurID, 'Int'),
-      );
-
-      $smartDebitReference = CRM_Core_DAO::singleValueQuery($query, $queryParams);
-      $contributionRecurDetails = array();
-      if (!empty($smartDebitReference)) {
-	$smartDebitResponse = CRM_DirectDebit_Form_SyncSd::getSmartDebitPayments($smartDebitReference);
-	foreach ($smartDebitResponse[0] as $key => $value) {
-	  $contributionRecurDetails[$key] = $value;
-	}
-      $contributionRecurDetails = json_encode($contributionRecurDetails);
-      $page->assign('contributionRecurDetails', $contributionRecurDetails);
-      }
-    }
-  }
-}
-
-function uk_direct_debit_civicrm_validateForm($name, &$fields, &$files, &$form, &$errors) {
-  // Only do recurring edit form
-  if (!in_array($name, array(
-    'CRM_Contribute_Form_UpdateSubscription',
-  ))) {
-    return;
-  }
-  // only do if payment process is Smart Debit
-  if (isset($fields['payment_processor_type']) && $fields['payment_processor_type'] == 'Smart Debit') {
-    $recurID	      = $form->getVar('_crid');
-    $linkedMembership = FALSE; 
-    // Check this recurring contribution is linked to membership
-    $membershipID = CRM_Core_DAO::singleValueQuery('SELECT id FROM civicrm_membership WHERE contribution_recur_id = %1', array(1=>array($recurID, 'Int')));
-    if ($membershipID) {
-      $linkedMembership = TRUE;
-    }      
-    // If recurring is linked to membership then check amount is higher than membership amount
-    if ($linkedMembership) {
-      $query = "
-	SELECT cc.total_amount
-	FROM civicrm_contribution cc 
-	INNER JOIN civicrm_membership_payment cmp ON cmp.contribution_id = cc.id
-	INNER JOIN civicrm_membership cm ON cm.id = cmp.membership_id
-	WHERE cmp.membership_id = %1";
-      $membershipAmount = CRM_Core_DAO::singleValueQuery($query, array(1 => array($membershipID, 'Int')));
-      if($fields['amount'] < $membershipAmount) {
-	$errors['amount'] = ts('Amount should be higher than corresponding membership amount');	
-      }      
-    }
-  }  
 }

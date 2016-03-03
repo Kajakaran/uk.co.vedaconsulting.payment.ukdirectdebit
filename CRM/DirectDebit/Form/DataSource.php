@@ -86,8 +86,6 @@ class CRM_DirectDebit_Form_DataSource extends CRM_Core_Form {
     if(!empty($dateOfCollection)){
       $dateOfCollection = date('Y-m-d', strtotime($dateOfCollection));
       $aCollectionDate  = self::getSmartDebitPayments( $dateOfCollection );
-      $session = CRM_Core_Session::singleton();
-      $session->set("collection_date", $dateOfCollection);
     }
 
     if( $aCollectionDate === false ){
@@ -165,7 +163,7 @@ class CRM_DirectDebit_Form_DataSource extends CRM_Core_Form {
       CRM_Core_Session::setStatus(ts('Please Select the Date of Collection'), Error, 'error');
       return false;
     }
-     
+
     $userDetails = self::getSmartDebitUserDetails();
     $username    = CRM_Utils_Array::value('username', $userDetails);
     $password    = CRM_Utils_Array::value('password', $userDetails);
@@ -173,17 +171,11 @@ class CRM_DirectDebit_Form_DataSource extends CRM_Core_Form {
   
     $collections = array();
     $url         = "https://secure.ddprocessing.co.uk/api/get_collection_report?query[service_user][pslid]=$pslid&query[debit_date]=$dateOfCollection";
-    $response    = CRM_DirectDebit_Form_SyncSd::requestPost( $url, $username, $password );   
+    $response    = CRM_DirectDebit_Form_SyncSd::requestPost( $url, $username, $password );    
 
     // Take action based upon the response status
     switch ( strtoupper( $response["Status"] ) ) {
         case 'OK':
-	  if (!isset($response['Successes']) || !isset($response['Rejects'])) {
-	    $url = CRM_Utils_System::url('civicrm/directdebit/syncsd/import');
-	    CRM_Core_Session::setStatus($response['Summary'], ts('Sorry'), 'error');
-	    CRM_Utils_System::redirect($url); 
-	    return FALSE;
-	  }
 
             $collections = array();
 
@@ -196,19 +188,6 @@ class CRM_DirectDebit_Form_DataSource extends CRM_Core_Form {
               }         
             }         
             return $collections;
-	case 'INVALID':
-	  $msg = "<ul>";
-	  $msg .= "<li>";
-	  $msg .= $response['body']['div']['h1'];
-	  $msg .= "</li>";
-	  $msg .= "<li>";
-	  $msg .= $response['body']['div']['p'];
-	  $msg .= "</li>";
-	  $msg .= "</ul>";
-	  $url = CRM_Utils_System::url('civicrm/directdebit/syncsd/import');
-	  CRM_Core_Session::setStatus($msg, ts('Sorry'), 'error');
-	  CRM_Utils_System::redirect($url);  
-	  return FALSE;
             
         default:
             return false;

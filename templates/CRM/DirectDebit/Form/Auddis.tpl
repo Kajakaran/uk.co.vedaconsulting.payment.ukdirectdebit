@@ -41,13 +41,13 @@
         <td>{$auddis.reference}</td>
         <td>
             {if $auddis.contact_id gt 0}
-		{assign var=contactId value=$auddis.contact_id}
-		{capture assign=contactViewURL}{crmURL p='civicrm/contact/view' q="reset=1&cid=$contactId"}{/capture}
-                <a href="{$contactViewURL}">{$auddis.contact_name}</a>
-            {else}
-                {$auddis.contact_name}
-            {/if}
-        </td>
+									{assign var=contactName value=$auddis.contact_name}
+                  {assign var=contactId value=$auddis.contact_id}
+                  {capture assign=crmURL}{crmURL p='civicrm/contact/view' q="cid=$contactId&reset=1"}{/capture}
+                  {ts 1=$crmURL 2=$contactName}<a href='%1'>%2</a>{/ts}
+							  {else}
+									{$auddis.contact_name}
+								{/if}</td>
         <td>{$auddis.frequency}</td>
         <td>{$auddis.$reason}</td>
         <td>{$auddis.start_date|crmDate}</td>
@@ -81,13 +81,13 @@
             <td>{$row.transaction_id}</td>
             <td>
                 {if $row.contact_id gt 0}
+                    {assign var=contactName value=$row.contact_name}
                     {assign var=contactId value=$row.contact_id}
-                    {capture assign=contactViewURL}{crmURL p='civicrm/contact/view' q="reset=1&cid=$contactId"}{/capture}
-                    <a href="{$contactViewURL}">{$row.contact_name}</a>
+                    {capture assign=crmURL}{crmURL p='civicrm/contact/view' q="cid=$contactId&reset=1"}{/capture}
+                    {ts 1=$crmURL 2=$contactName}<a href='%1'>%2</a>{/ts}
                 {else}
                     {$row.contact_name}
-                {/if}
-            </td>
+                {/if}</td>
             <td>{$row.frequency}</td>
             <td>{$row.start_date|crmDate}</td>
             <td style ="text-align: right">{$row.amount|crmMoney}</td>
@@ -120,13 +120,13 @@
             <td>{$row.transaction_id}</td>
             <td>
                 {if $row.contact_id gt 0}
+                    {assign var=contactName value=$row.contact_name}
                     {assign var=contactId value=$row.contact_id}
-                    {capture assign=contactViewURL}{crmURL p='civicrm/contact/view' q="reset=1&cid=$contactId"}{/capture}
-                    <a href="{$contactViewURL}">{$row.contact_name}</a>
+                    {capture assign=crmURL}{crmURL p='civicrm/contact/view' q="cid=$contactId&reset=1"}{/capture}
+                    {ts 1=$crmURL 2=$contactName}<a href='%1'>%2</a>{/ts}
                 {else}
                     {$row.contact_name}
-                {/if}
-            </td>
+                {/if}</td>
             <td>{$row.frequency}</td>
             <td>{$row.start_date|crmDate}</td>
             <td style ="text-align: right">{$row.amount|crmMoney}</td>
@@ -158,13 +158,13 @@
             <td>{$row.transaction_id}</td>
             <td>
                 {if $row.contact_id gt 0}
+                    {assign var=contactName value=$row.contact_name}
                     {assign var=contactId value=$row.contact_id}
-                    {capture assign=contactViewURL}{crmURL p='civicrm/contact/view' q="reset=1&cid=$contactId"}{/capture}
-                    <a href="{$contactViewURL}">{$row.contact_name}</a>
+                    {capture assign=crmURL}{crmURL p='civicrm/contact/view' q="cid=$contactId&reset=1"}{/capture}
+                    {ts 1=$crmURL 2=$contactName}<a href='%1'>%2</a>{/ts}
                 {else}
                     {$row.contact_name}
-                {/if}
-            </td>
+                {/if}</td>
             <td>{$row.frequency}</td>
             <td>{$row.start_date|crmDate}</td>
             <td style ="text-align: right">{$row.amount|crmMoney}</td>

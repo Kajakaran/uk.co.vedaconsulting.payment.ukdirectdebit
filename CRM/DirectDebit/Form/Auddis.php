@@ -30,7 +30,7 @@ class CRM_DirectDebit_Form_Auddis extends CRM_Core_Form {
       foreach ($auddisFile as $inside => $value) {
 
         $sql = "
-          SELECT ctrc.id contribution_recur_id ,ctrc.contact_id , cont.display_name ,ctrc.start_date , ctrc.amount, ctrc.trxn_id , ctrc.frequency_unit, ctrc.frequency_interval
+          SELECT ctrc.id contribution_recur_id ,ctrc.contact_id , cont.display_name ,ctrc.start_date , ctrc.amount, ctrc.trxn_id , ctrc.frequency_unit
           FROM civicrm_contribution_recur ctrc
           LEFT JOIN civicrm_contact cont ON (ctrc.contact_id = cont.id)
           WHERE ctrc.trxn_id = %1";
@@ -44,7 +44,7 @@ class CRM_DirectDebit_Form_Auddis extends CRM_Core_Form {
             $newAuddisArray[$key]['contact_id']               = $dao->contact_id;
             $newAuddisArray[$key]['contact_name']             = $dao->display_name;
             $newAuddisArray[$key]['start_date']               = $dao->start_date;
-            $newAuddisArray[$key]['frequency']                = $dao->frequency_interval.' '.$dao->frequency_unit;
+            $newAuddisArray[$key]['frequency']                = $dao->frequency_unit;
             $newAuddisArray[$key]['amount']                   = $dao->amount;
             $newAuddisArray[$key]['contribution_status_id']   = $dao->contribution_status_id;
             $newAuddisArray[$key]['transaction_id']           = $dao->trxn_id;
@@ -100,9 +100,8 @@ class CRM_DirectDebit_Form_Auddis extends CRM_Core_Form {
 
     if(!empty($validIds)){
     $validIdsString = implode(',', $validIds);
-    $sql = "SELECT ctrc.id contribution_recur_id ,ctrc.contact_id , cont.display_name ,ctrc.start_date , sdpayments.amount, ctrc.trxn_id , ctrc.frequency_unit, ctrc.payment_instrument_id, ctrc.contribution_status_id, ctrc.frequency_interval
+    $sql = "SELECT ctrc.id contribution_recur_id ,ctrc.contact_id , cont.display_name ,ctrc.start_date , ctrc.amount, ctrc.trxn_id , ctrc.frequency_unit, ctrc.payment_instrument_id, ctrc.contribution_status_id
       FROM civicrm_contribution_recur ctrc
-      INNER JOIN veda_civicrm_smartdebit_import sdpayments ON sdpayments.transaction_id = ctrc.trxn_id
       INNER JOIN civicrm_contact cont ON (ctrc.contact_id = cont.id)
       WHERE ctrc.trxn_id IN ($validIdsString)";
 
@@ -115,7 +114,7 @@ class CRM_DirectDebit_Form_Auddis extends CRM_Core_Form {
                         'contact_id' => $dao->contact_id,
                         'contact_name' => $dao->display_name,
                         'start_date' => $dao->start_date,
-                        'frequency' => $dao->frequency_interval.' '.$dao->frequency_unit,
+                        'frequency' => $dao->frequency_unit,
                         'amount' => $dao->amount,
                         'contribution_status_id' => $dao->contribution_status_id,
                         'transaction_id' => $dao->trxn_id,
@@ -141,7 +140,7 @@ class CRM_DirectDebit_Form_Auddis extends CRM_Core_Form {
 
       // Show the already processed contributions
     $contributionQuery = "
-        SELECT cc.contact_id, cont.display_name, cc.total_amount, cc.trxn_id, ctrc.start_date, ctrc.frequency_unit, ctrc.frequency_interval
+        SELECT cc.contact_id, cont.display_name, cc.total_amount, cc.trxn_id, ctrc.start_date, ctrc.frequency_unit
         FROM `civicrm_contribution` cc
         LEFT JOIN civicrm_contribution_recur ctrc ON (ctrc.id = cc.contribution_recur_id)
         INNER JOIN civicrm_contact cont ON (cc.contact_id = cont.id)
@@ -154,7 +153,7 @@ class CRM_DirectDebit_Form_Auddis extends CRM_Core_Form {
         $existArray[$key]['contact_id']            = $dao->contact_id;
         $existArray[$key]['contact_name']          = $dao->display_name;
         $existArray[$key]['start_date']            = $dao->start_date;
-        $existArray[$key]['frequency']             = $dao->frequency_interval.' '.$dao->frequency_unit;
+        $existArray[$key]['frequency']             = $dao->frequency_unit;
         $existArray[$key]['amount']                = $dao->total_amount;
         $existArray[$key]['contribution_status_id']    = $dao->contribution_status_id;
         $existArray[$key]['transaction_id']        = $dao->trxn_id;
@@ -207,14 +206,14 @@ class CRM_DirectDebit_Form_Auddis extends CRM_Core_Form {
     }
 
     $redirectUrlBack      = CRM_Utils_System::url('civicrm/directdebit/syncsd/import', 'reset=1');
-    $redirectUrlContinue  = CRM_Utils_System::url('civicrm/directdebit/syncsd/confirm', $queryDates);
-    $redirectUrlBack = str_replace('&amp;', '&', $redirectUrlBack);
+    $redirectUrlContinue  = CRM_Utils_System::url('civicrm/directdebit/syncsd/confirm', 'reset=1');
+		$redirectUrlBack = str_replace('&amp;', '&', $redirectUrlBack);
     $redirectUrlContinue = str_replace('&amp;', '&', $redirectUrlContinue);
     if(!empty($matchTrxnIds)) {
       $this->addButtons(array(
               array(
                 'type' => 'next',
-                'js' => array('onclick' => "location.href='{$redirectUrlContinue}'; return false;"),
+                'js' => array('onclick' => "location.href='{$redirectUrlContinue}' + '&' + '{$queryDates}' ; return false;"),
                 'name' => ts('Continue'),
                 ),
               array(
@@ -274,24 +273,15 @@ class CRM_DirectDebit_Form_Auddis extends CRM_Core_Form {
   static function getRightAuddisFile($auddisArray = array(), $auddisDate = NULL) {
     $auddisDetails = array();
     if($auddisArray && $auddisDate) {
-     if (isset($auddisArray[0]['@attributes'])) {
-        // Multiple results returned
-        foreach ($auddisArray as $key => $auddis) {
-          if(strtotime($auddisDate) == strtotime(substr($auddis['report_generation_date'], 0, 10))){
-            $auddisDetails['auddis_id']              = $auddis['auddis_id'];
-            $auddisDetails['report_generation_date'] = substr($auddis['report_generation_date'], 0, 10);
-            $auddisDetails['uri']                    = $auddis['@attributes']['uri'];
-            break;
-          }
-        }
-      } else {
-        // Only one result returned
-        if(strtotime($auddisDate) == strtotime(substr($auddisArray['report_generation_date'], 0, 10))){
-          $auddisDetails['auddis_id']              = $auddisArray['auddis_id'];
-          $auddisDetails['report_generation_date'] = substr($auddisArray['report_generation_date'], 0, 10);
-          $auddisDetails['uri']                    = $auddisArray['@attributes']['uri'];
-        }
-      }
+     foreach ($auddisArray as $key => $auddis) {
+       if(strtotime($auddisDate) == strtotime(substr($auddis['report_generation_date'], 0, 10))){
+         $auddisDetails['auddis_id']              = $auddis['auddis_id'];
+         $auddisDetails['report_generation_date'] = substr($auddis['report_generation_date'], 0, 10);
+         $auddisDetails['uri']                    = $auddis['@attributes']['uri'];
+         break;
+       }
+
+     }
     }
     return $auddisDetails;
   }

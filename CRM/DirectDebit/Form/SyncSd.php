@@ -18,20 +18,12 @@ class CRM_DirectDebit_Form_SyncSd extends CRM_Core_Form {
 
     // Get the auddis Dates from the Auddis Files
     if($auddisArray) {
-      if (isset($auddisArray[0]['@attributes'])) {
-        // Multiple results returned
-        foreach ($auddisArray as $key => $auddis) {
+      foreach ($auddisArray as $key => $auddis) {
           $auddisDetails['auddis_id']              = $auddis['auddis_id'];
-          $auddisDetails['report_generation_date'] = date('Y-m-d', strtotime($auddisArray['report_generation_date']));
-          $auddisDates[]                           = date('Y-m-d', strtotime($auddisArray['report_generation_date']));
+          $auddisDetails['report_generation_date'] = substr($auddis['report_generation_date'], 0, 10);
+          $auddisDates[]                           = substr($auddis['report_generation_date'], 0, 10);
           $auddisDetails['uri']                    = $auddis['@attributes']['uri'];
-        }
-      } else {
-        // Only one result returned
-        $auddisDetails['auddis_id']              = $auddisArray['auddis_id'];
-        $auddisDetails['report_generation_date'] = date('Y-m-d', strtotime($auddisArray['report_generation_date']));
-        $auddisDates[]                           = date('Y-m-d', strtotime($auddisArray['report_generation_date']));
-        $auddisDetails['uri']                    = $auddisArray['@attributes']['uri'];
+
       }
     }
 
@@ -110,8 +102,7 @@ class CRM_DirectDebit_Form_SyncSd extends CRM_Core_Form {
   }
 
   static function getSmartDebitAuddis($uri = NULL) {
-    $session = CRM_Core_Session::singleton();
-    $dateOfCollection = $session->get('collection_date');
+
     $userDetails = CRM_DirectDebit_Form_DataSource::getSmartDebitUserDetails();
     $username    = CRM_Utils_Array::value('username', $userDetails);
     $password    = CRM_Utils_Array::value('password', $userDetails);
@@ -143,8 +134,7 @@ class CRM_DirectDebit_Form_SyncSd extends CRM_Core_Form {
     else {
 
   // Send payment POST to the target URL
-      $previousDateBackMonth = date('Y-m-d', strtotime($dateOfCollection.'-1 month'));
-      $urlAuddis = "https://secure.ddprocessing.co.uk/api/auddis/list?query[service_user][pslid]=$pslid&query[from_date]=$previousDateBackMonth&query[till_date]=$dateOfCollection";
+      $urlAuddis = "https://secure.ddprocessing.co.uk/api/auddis/list?query[service_user][pslid]=$pslid";
 
       $responseAuddis = self::requestPost( $urlAuddis, $username, $password );
 
@@ -234,7 +224,7 @@ class CRM_DirectDebit_Form_SyncSd extends CRM_Core_Form {
     $url = "https://secure.ddprocessing.co.uk/api/data/dump?query[service_user][pslid]=$pslid&query[report_format]=XML";
     // Restrict to a single payer if we have a reference
     if ($referenceNumber) {
-      $url .= "&query[reference_number]=".rawurlencode($referenceNumber);
+      $url .= "&query[reference_number]=$referenceNumber";
     }
 
     $response = self::requestPost( $url, $username, $password );
