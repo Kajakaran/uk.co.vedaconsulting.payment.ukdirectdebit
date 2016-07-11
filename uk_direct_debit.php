@@ -550,6 +550,7 @@ function uk_direct_debit_civicrm_buildForm( $formName, &$form ) {
           "links" => array( "mandate" => $response['redirect_flows']['links']['mandate'])
         );
         
+        CRM_DirectDebit_Utils_Hook::alterGocardlessSubscriptionParams($subscription_params, $pageID, $membershipID, $contributionRecurId);
         if (!empty($form->_params['preferred_collection_day']) && $interval_unit == 'monthly') {
           $subscription_params['day_of_month'] = $form->_params['preferred_collection_day'];
         } else if ($interval_unit == 'monthly') {
@@ -1300,4 +1301,13 @@ function uk_direct_debit_civicrm_validateForm($name, &$fields, &$files, &$form, 
       }      
     }
   }  
+}
+
+function uk_direct_debit_civicrm_alterGocardlessSubscriptionParams(&$params, $contributionPageId, $membershipId, $contributionRecurId) {
+  if ($membershipId && $contributionPageId == 16) {// We set up membership page with yearly but we want to send to gocardless as every three months
+    $params['amount'] =  $params['amount']/4;
+    $params['interval'] = 3;
+    $params['interval_unit'] = 'monthly';
+    $params['count'] = 4;
+  }
 }

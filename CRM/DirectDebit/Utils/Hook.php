@@ -106,4 +106,8 @@ abstract class CRM_DirectDebit_Utils_Hook {
   static function handleSmartDebitMembershipRenewal( &$params ) {
     return self::singleton( )->invoke( 1, $params, self::$_nullObject, self::$_nullObject, self::$_nullObject, self::$_nullObject, self::$_nullObject, 'civicrm_handleSmartDebitMembershipRenewal' );
   }
+  
+  static function alterGocardlessSubscriptionParams( &$params, $contributionPageId, $membershipId, $contributionRecurId ) {
+    return self::singleton( )->invoke( 4, $params, $contributionPageId, $membershipId, $contributionRecurId, self::$_nullObject, self::$_nullObject, 'civicrm_alterGocardlessSubscriptionParams' );
+  }
 }
