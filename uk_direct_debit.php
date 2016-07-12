@@ -1308,6 +1308,5 @@ function uk_direct_debit_civicrm_alterGocardlessSubscriptionParams(&$params, $co
     $params['amount'] =  $params['amount']/4;
     $params['interval'] = 3;
     $params['interval_unit'] = 'monthly';
-    $params['count'] = 4;
   }
 }
